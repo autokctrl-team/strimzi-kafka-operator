@@ -8,6 +8,9 @@ import io.strimzi.api.kafka.model.kafka.Kafka;
 import io.strimzi.operator.common.AdminClientProvider;
 import io.strimzi.operator.common.Reconciliation;
 import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.Config;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.DescribeConfigsResult;
 import org.apache.kafka.clients.admin.DescribeTopicsResult;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.TopicDescription;
@@ -15,6 +18,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartitionInfo;
+import org.apache.kafka.common.config.ConfigResource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
@@ -79,6 +83,39 @@ public class BrokersInUseCheckTest {
 
         assertThat(brokersInUse.size(), is(3));
         assertThat(brokersInUse, is(Set.of(0, 1, 2)));
+    }
+
+    @Test
+    public void testCordonedBrokers() {
+        Admin admin = mock(Admin.class);
+        AdminClientProvider provider = mock(AdminClientProvider.class);
+        when(provider.createAdminClient(anyString(), any(), any())).thenReturn(admin);
+
+        ConfigResource broker1 = new ConfigResource(ConfigResource.Type.BROKER, "1");
+        ConfigResource broker2 = new ConfigResource(ConfigResource.Type.BROKER, "2");
+        DescribeConfigsResult result = mock(DescribeConfigsResult.class);
+        when(result.all()).thenReturn(KafkaFuture.completedFuture(Map.of(
+                broker1, new Config(List.of(new ConfigEntry("cordoned.log.dirs", "*"))),
+                broker2, new Config(List.of(new ConfigEntry("cordoned.log.dirs", null))))));
+        when(admin.describeConfigs(anyCollection())).thenReturn(result);
+
+        boolean cordoned = new BrokersInUseCheck()
+                .brokersCordoned(RECONCILIATION, DUMMY_IDENTITY, provider, Set.of(1, 2))
+                .toCompletableFuture()
+                .join();
+
+        assertThat(cordoned, is(false));
+
+        when(result.all()).thenReturn(KafkaFuture.completedFuture(Map.of(
+                broker1, new Config(List.of(new ConfigEntry("cordoned.log.dirs", "*"))),
+                broker2, new Config(List.of(new ConfigEntry("cordoned.log.dirs", "*"))))));
+
+        cordoned = new BrokersInUseCheck()
+                .brokersCordoned(RECONCILIATION, DUMMY_IDENTITY, provider, Set.of(1, 2))
+                .toCompletableFuture()
+                .join();
+
+        assertThat(cordoned, is(true));
     }
 
     @Test

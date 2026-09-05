@@ -282,6 +282,7 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
         private Map<String, ResourceRequirements> kafkaBrokerResources;
         // needed to take information for the auto-rebalancing on scaling via Cruise Control
         private Set<Integer> scalingDownBlockedNodes;
+        private Set<Integer> nodesToCordon;
         private KafkaClusterSecurityContext securityContext;
 
         /* test */ KafkaStatus kafkaStatus = new KafkaStatus();
@@ -504,7 +505,7 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
                     supplier,
                     pfa,
                     vertx,
-                    scalingDownBlockedNodes
+                    nodesToCordon
             );
         }
 
@@ -555,6 +556,7 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
                                     kafkaBrokerStorage = kafkaCluster.getStorageByPoolName();
                                     kafkaBrokerResources = kafkaCluster.getBrokerResourceRequirementsByPoolName();
                                     scalingDownBlockedNodes = kafkaClusterCreator.scalingDownBlockedNodes();
+                                    nodesToCordon = kafkaClusterCreator.nodesToCordon();
 
                                     return Future.succeededFuture(kafkaReconciler(nodePools, kafkaCluster));
                                 });

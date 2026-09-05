@@ -24,6 +24,7 @@ import io.strimzi.operator.common.AdminClientProvider;
 import io.strimzi.operator.common.Annotations;
 import io.strimzi.operator.common.Reconciliation;
 import io.strimzi.operator.common.ReconciliationLogger;
+import io.strimzi.operator.common.auth.Identity;
 import io.strimzi.operator.common.model.InvalidResourceException;
 import io.strimzi.operator.common.model.StatusUtils;
 import io.strimzi.operator.common.operator.resource.kubernetes.SecretOperator;
@@ -54,9 +55,11 @@ public class KafkaClusterCreator {
     private final BrokersInUseCheck brokerScaleDownOperations;
     // State
     private boolean scaleDownCheckFailed = false;
+    private boolean scaleDownCordonPending = false;
     private boolean usedToBeBrokersCheckFailed = false;
     private final List<Condition> warningConditions = new ArrayList<>();
     private final Set<Integer> scalingDownBlockedNodes = new HashSet<>();
+    private final Set<Integer> nodesToCordon = new HashSet<>();
 
     /**
      * Constructor
@@ -89,6 +92,10 @@ public class KafkaClusterCreator {
         return scalingDownBlockedNodes;
     }
 
+    /* test */ Set<Integer> nodesToCordon() {
+        return nodesToCordon;
+    }
+
     /**
      * Prepares the Kafka Cluster model instance. It checks if any scale-down is happening and whether such scale-down
      * can be done. If it discovers any problems, it will try to fix them and create a fixed Kafka Cluster model
@@ -116,8 +123,10 @@ public class KafkaClusterCreator {
                 .thenCompose(kafka -> brokerRemovalCheck(kafkaCr, kafka))
                 .thenCompose(kafka -> {
                     if (checkFailed() && tryToFixProblems)   {
-                        // saving scaling down blocked nodes, before they are reverted back
-                        this.scalingDownBlockedNodes.addAll(kafka.removedNodes());
+                        nodesToCordon.addAll(kafka.removedBrokerNodes());
+                        if (scaleDownCheckFailed) {
+                            scalingDownBlockedNodes.addAll(kafka.removedBrokerNodes());
+                        }
                         // We have a failure, and should try to fix issues
                         // Once we fix it, we call this method again, but this time with tryToFixProblems set to false
                         return revertScaleDown(nodePools)
@@ -182,15 +191,17 @@ public class KafkaClusterCreator {
         if (skipBrokerScaleDownCheck(kafkaCr) // The check was disabled by the user
                 || (kafka.removedNodes().isEmpty() && kafka.usedToBeBrokerNodes().isEmpty())) { // There is no scale-down or role change, so there is nothing to check
             scaleDownCheckFailed = false;
+            scaleDownCordonPending = false;
             usedToBeBrokersCheckFailed = false;
             return CompletableFuture.completedFuture(kafka);
         } else {
             return ReconcilerUtils.coIdentity(reconciliation, secretOperator, kafka.securityContext())
                     .toCompletionStage()
-                    .thenCompose(coTlsPemIdentity -> brokerScaleDownOperations.brokersInUse(reconciliation, coTlsPemIdentity, adminClientProvider))
+                    .thenCompose(coTlsPemIdentity -> cordonCheck(kafka, coTlsPemIdentity)
+                        .thenCompose(ignored -> brokerScaleDownOperations.brokersInUse(reconciliation, coTlsPemIdentity, adminClientProvider)))
                     .thenApply(brokersInUse -> {
                         // Check nodes that are being scaled down
-                        Set<Integer> scaledDownBrokersInUse = kafka.removedNodes().stream().filter(brokersInUse::contains).collect(Collectors.toSet());
+                        Set<Integer> scaledDownBrokersInUse = kafka.removedBrokerNodes().stream().filter(brokersInUse::contains).collect(Collectors.toSet());
                         if (!scaledDownBrokersInUse.isEmpty()) {
                             LOGGER.warnCr(reconciliation, "Cannot scale down brokers {} because {} have assigned partition-replicas", kafka.removedNodes(), scaledDownBrokersInUse);
                             scaleDownCheckFailed = true;
@@ -212,16 +223,32 @@ public class KafkaClusterCreator {
         }
     }
 
+    private CompletionStage<Void> cordonCheck(KafkaCluster kafka, Identity coIdentity) {
+        if (kafka.removedBrokerNodes().isEmpty()
+                || KafkaVersion.compareVersions(kafka.getKafkaVersion().version(), "4.3.0") < 0) {
+            scaleDownCordonPending = false;
+            return CompletableFuture.completedFuture(null);
+        }
+
+        return brokerScaleDownOperations.brokersCordoned(reconciliation, coIdentity, adminClientProvider, kafka.removedBrokerNodes())
+                .thenAccept(cordoned -> {
+                    scaleDownCordonPending = !cordoned;
+                    if (scaleDownCordonPending) {
+                        LOGGER.infoCr(reconciliation, "Delaying scale-down of Kafka brokers {} until they are cordoned", kafka.removedBrokerNodes());
+                    }
+                });
+    }
+
     /**
-     * Reverts the broker scale down if it is not allowed because the brokers are not empty
+     * Reverts the broker scale down if it is not allowed because the brokers are not empty or not yet cordoned
      *
      * @param nodePoolCrs   List with KafkaNodePool custom resources
      *
      * @return  CompletionStage with KafkaAndNodePools record containing the fixed Kafka and KafkaNodePool CRs
      */
     private CompletionStage<List<KafkaNodePool>> revertScaleDown(List<KafkaNodePool> nodePoolCrs)   {
-        if (scaleDownCheckFailed) {
-            // Node pools are used -> we have to fix scale down in the KafkaNodePools
+        if (scaleDownCheckFailed || scaleDownCordonPending) {
+            // Node pools cannot be removed yet -> we have to fix scale down in the KafkaNodePools
             List<KafkaNodePool> newNodePools = new ArrayList<>();
 
             for (KafkaNodePool nodePool : nodePoolCrs) {
@@ -302,7 +329,7 @@ public class KafkaClusterCreator {
      * @return  True if any checks failed. False otherwise.
      */
     private boolean checkFailed()   {
-        return scaleDownCheckFailed || usedToBeBrokersCheckFailed;
+        return scaleDownCheckFailed || scaleDownCordonPending || usedToBeBrokersCheckFailed;
     }
 
     /**

@@ -419,6 +419,7 @@ public class ResourceUtils {
         when(supplier.roleBindingOperations.reconcile(any(), anyString(), anyString(), any())).thenReturn(CompletableFuture.completedFuture(null));
         when(supplier.roleOperations.reconcile(any(), anyString(), anyString(), any())).thenReturn(CompletableFuture.completedFuture(null));
         when(supplier.clusterRoleBindingOperator.reconcile(any(), anyString(), any())).thenReturn(CompletableFuture.completedFuture(null));
+        when(supplier.brokersInUseCheck.brokersCordoned(any(), any(), any(), any())).thenReturn(CompletableFuture.completedFuture(true));
 
         if (openShift) {
             when(supplier.routeOperations.reconcile(any(), anyString(), anyString(), any())).thenReturn(CompletableFuture.completedFuture(null));

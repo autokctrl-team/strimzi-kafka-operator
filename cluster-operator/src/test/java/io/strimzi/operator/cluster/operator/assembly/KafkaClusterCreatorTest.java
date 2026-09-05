@@ -376,6 +376,25 @@ public class KafkaClusterCreatorTest {
     }
 
     @Test
+    public void testScaleDownWaitsForCordonWithKRaft() throws Exception {
+        ResourceOperatorSupplier supplier = ResourceUtils.supplierWithMocks(false);
+        when(supplier.brokersInUseCheck.brokersInUse(any(), any(), any()))
+                .thenReturn(CompletableFuture.completedFuture(Set.of(1000, 1001, 1002, 2000, 2001, 2002, 3000, 3001, 3002)));
+        when(supplier.brokersInUseCheck.brokersCordoned(any(), any(), any(), any()))
+            .thenReturn(CompletableFuture.completedFuture(false));
+
+        KafkaClusterCreator creator = new KafkaClusterCreator(RECONCILIATION, CO_CONFIG, supplier);
+        KafkaCluster kc = creator.prepareKafkaCluster(KAFKA, List.of(POOL_CONTROLLERS_WITH_STATUS_5_NODES, POOL_A_WITH_STATUS_5_NODES, POOL_B_WITH_STATUS_5_NODES), Map.of(), KafkaVersionTestUtils.DEFAULT_KRAFT_VERSION_CHANGE, new KafkaStatus(), true, KafkaClusterSecurityContext.DEFAULT_KAFKA_CLUSTER_SECURITY_CONTEXT)
+                .toCompletableFuture()
+                .join();
+
+        assertThat(kc.nodes().size(), is(13));
+        assertThat(kc.removedNodes(), is(Set.of(3003, 3004)));
+        assertThat(creator.nodesToCordon(), is(Set.of(1003, 1004, 2003, 2004)));
+        assertThat(creator.scalingDownBlockedNodes(), is(Set.of()));
+    }
+
+    @Test
     public void testThrowsRevertScaleDownFailsWithKRaft() throws Exception {
         ResourceOperatorSupplier supplier = ResourceUtils.supplierWithMocks(false);
 

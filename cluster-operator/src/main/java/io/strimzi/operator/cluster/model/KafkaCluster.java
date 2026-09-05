@@ -457,6 +457,19 @@ public class KafkaCluster extends AbstractModel implements SupportsMetrics, Supp
     }
 
     /**
+     * Generates list of Kafka broker IDs that are going to be removed from the Kafka cluster.
+     *
+     * @return Set of Kafka broker IDs which are going to be removed
+     */
+    public Set<Integer> removedBrokerNodes() {
+        return nodePools.stream()
+                .filter(KafkaPool::isBroker)
+                .flatMap(pool -> pool.scaledDownNodes().stream())
+                .map(NodeRef::nodeId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    /**
      * Generates list of Kafka node IDs that used to have the broker role but do not have it anymore.
      *
      * @return  Set of Kafka node IDs which are removing the broker role

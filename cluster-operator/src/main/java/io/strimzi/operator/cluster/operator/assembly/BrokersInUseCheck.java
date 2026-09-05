@@ -16,17 +16,21 @@ import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartitionInfo;
+import org.apache.kafka.common.config.ConfigResource;
 
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.stream.Collectors;
 
 /**
  * Class which contains several utility function which check if broker scale down or role change can be done or not.
  */
 public class BrokersInUseCheck {
+    private static final String CORDONED_LOG_DIRS = "cordoned.log.dirs";
+
     /**
      * Logger
      */
@@ -74,6 +78,34 @@ public class BrokersInUseCheck {
                     });
         } catch (KafkaException e) {
             LOGGER.warnCr(reconciliation, "Failed to check if broker contains any partition replicas", e);
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    /**
+     * Checks which brokers have all log directories cordoned.
+     *
+     * @param reconciliation        Reconciliation marker
+     * @param coIdentity            Trust set and identity for authentication for connecting to the Kafka cluster
+     * @param adminClientProvider   Used to create the Admin client instance
+     * @param brokerIds             IDs of the brokers to check
+     *
+     * @return whether all requested brokers have {@code cordoned.log.dirs=*} in their effective configuration
+     */
+    public CompletionStage<Boolean> brokersCordoned(Reconciliation reconciliation, Identity coIdentity, AdminClientProvider adminClientProvider, Set<Integer> brokerIds) {
+        try {
+            String bootstrapHostname = KafkaResources.bootstrapServiceName(reconciliation.name()) + "." + reconciliation.namespace() + ".svc:" + KafkaCluster.REPLICATION_PORT;
+            Admin kafkaAdmin = adminClientProvider.createAdminClient(bootstrapHostname, coIdentity.trustSet(), coIdentity.authIdentity());
+            Set<ConfigResource> resources = brokerIds.stream()
+                    .map(id -> new ConfigResource(ConfigResource.Type.BROKER, id.toString()))
+                    .collect(Collectors.toSet());
+
+            return kafkaAdmin.describeConfigs(resources).all().toCompletionStage()
+                    .thenApply(configs -> configs.keySet().containsAll(resources)
+                    && configs.values().stream().allMatch(config -> config.get(CORDONED_LOG_DIRS) != null
+                        && "*".equals(config.get(CORDONED_LOG_DIRS).value())))
+                    .whenComplete((result, error) -> kafkaAdmin.close());
+        } catch (KafkaException e) {
             return CompletableFuture.failedFuture(e);
         }
     }
