@@ -310,8 +310,8 @@ public class KafkaAutoRebalancingReconciler {
                                                 // after scaling down them, we don't need to continue the auto-rebalancing for scale up anymore
                                                 // (nodes are not there anymore!) so not queueing added nodes in the status
                                                 updateStatus(kafkaAutoRebalanceStatus, KafkaAutoRebalanceState.RebalanceOnScaleDown,
-                                                        !scalingNodes.blocked().equals(scalingNodes.added()) ? scalingNodes :
-                                                        new ScalingNodes(scalingNodes.blocked(), Set.of()));
+                                                        new ScalingNodes(scalingNodes.blocked(), scalingNodes.added().stream()
+                                                                .filter(node -> !scalingNodes.blocked().contains(node)).collect(Collectors.toSet())));
                                             } else {
                                                 updateStatus(kafkaAutoRebalanceStatus, KafkaAutoRebalanceState.Idle, EMPTY_SCALING_NODES);
                                             }
