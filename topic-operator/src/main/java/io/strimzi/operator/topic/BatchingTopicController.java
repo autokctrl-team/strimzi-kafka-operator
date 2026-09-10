@@ -795,8 +795,8 @@ public class BatchingTopicController {
         var apparentlyDifferentRf = currentStates.filter(pair -> {
             var reconcilableTopic = pair.getKey();
             var currentState = pair.getValue();
-            return currentState.uniqueReplicationFactor() > 0 && reconcilableTopic.kt().getSpec().getReplicas() != null
-                && currentState.uniqueReplicationFactor() != reconcilableTopic.kt().getSpec().getReplicas();
+            var specReplicas = reconcilableTopic.kt().getSpec().getReplicas();
+            return specReplicas != null && !currentState.partitionsWithDifferentRfThan(specReplicas).isEmpty();
         }).toList();
         return TopicOperatorUtil.partitionedByError(kafkaHandler.filterByReassignmentTargetReplicas(apparentlyDifferentRf).stream());
     }

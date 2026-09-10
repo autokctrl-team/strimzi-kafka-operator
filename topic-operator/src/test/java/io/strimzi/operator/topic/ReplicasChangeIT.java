@@ -32,6 +32,7 @@ import org.apache.kafka.clients.admin.ListPartitionReassignmentsResult;
 import org.apache.kafka.clients.admin.PartitionReassignment;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.TopicPartitionInfo;
 import org.junit.jupiter.api.AfterAll;
@@ -126,12 +127,13 @@ class ReplicasChangeIT implements TestSeparator {
         Mockito.doReturn(partitionReassignmentResult).when(kafkaAdmin).listPartitionReassignments(any(Set.class));
         
         var topicDescription = Mockito.mock(TopicDescription.class);
-        var topicPartitionInfo = Mockito.mock(TopicPartitionInfo.class);
-        Mockito.doReturn(List.of(topicPartitionInfo)).when(topicDescription).partitions();
+        var partition0 = Mockito.mock(TopicPartitionInfo.class);
+        Mockito.doReturn(List.of(Mockito.mock(Node.class))).when(partition0).replicas();
+        var partition1 = Mockito.mock(TopicPartitionInfo.class);
+        Mockito.doReturn(List.of(Mockito.mock(Node.class), Mockito.mock(Node.class))).when(partition1).replicas();
+        Mockito.doReturn(List.of(partition0, partition1)).when(topicDescription).partitions();
         
-        var currentState = Mockito.mock(TopicState.class);
-        Mockito.doReturn(replicationFactor).when(currentState).uniqueReplicationFactor();
-        Mockito.doReturn(topicDescription).when(currentState).description();
+        var currentState = new TopicState(topicDescription, null);
         
         var kafkaTopic = new KafkaTopicBuilder()
             .withNewMetadata()
