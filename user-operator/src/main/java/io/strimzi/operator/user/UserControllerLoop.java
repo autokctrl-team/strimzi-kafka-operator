@@ -156,8 +156,9 @@ public class UserControllerLoop extends AbstractControllerLoop {
         if (kafkaUser != null && desiredStatus != null && !new StatusDiff(reconciliation, kafkaUser.getStatus(), desiredStatus).isEmpty()) {
             LOGGER.debugCr(reconciliation, "Updating status of {} {} in namespace {}", reconciliation.kind(), reconciliation.name(), reconciliation.namespace());
             KafkaUser latestKafkaUser = userInformer.get(reconciliation.namespace(), reconciliation.name());
+            String kafkaUserUid = kafkaUser.getMetadata().getUid();
 
-            if (latestKafkaUser != null) {
+            if (latestKafkaUser != null && kafkaUserUid != null && kafkaUserUid.equals(latestKafkaUser.getMetadata().getUid())) {
                 KafkaUser updateKafkaUser = new KafkaUserBuilder(latestKafkaUser)
                         .withStatus(desiredStatus)
                         .build();
