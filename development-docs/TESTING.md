@@ -128,7 +128,7 @@ void setUp(ExtensionContext extensionContext) {
     KafkaBridgeTemplates.kafkaBridgeWithMetrics(...).build()
     );
     
-    // sync resources (barier)
+    // sync resources (barrier)
     KubeResourceManager.get().synchronizeResources(extensionContext);
 }
 ```
@@ -180,7 +180,7 @@ When you need to create a new test suite, firstly, make sure that it has the suf
 
 If you want to run system tests locally in parallel, you need to take a few additional steps. You have to modify
 two JUnit properties and there are two approaches how to do it:
-1) Using IDE (InteliJ)
+1) Using IDE (IntelliJ)
    1. on the left side between build project and run buttons you click on edit configuration
    2. then only one thing is to modify VM options and add these two:
       - `-Djunit.jupiter.execution.parallel.enabled=true`
@@ -271,7 +271,7 @@ The following table shows currently used tags:
 | connectoroperator |                   Execute tests that deploy KafkaConnector resource                   |
 |      connect      |                    Execute tests that deploy KafkaConnect resource                    |
 |   mirrormaker2    |                 Execute tests that deploy KafkaMirrorMaker2 resource                  |
-| conneccomponents  |  Execute tests that deploy KafkaConnect, KafkaMirrorMaker2, KafkaConnector resources  |
+| connectcomponents |  Execute tests that deploy KafkaConnect, KafkaMirrorMaker2, KafkaConnector resources  |
 |      bridge       |                          Execute tests that use Kafka Bridge                          |
 |  externalclients  |          Execute tests that use external (from code) Kafka clients in tests           |
 |        olm        |                Execute tests that test examples from Strimzi manifests                |
@@ -354,7 +354,7 @@ All environment variables are defined in [Environment](systemtest/src/main/java/
 | KAFKA_TIERED_STORAGE_CLASSPATH        | Classpath to the libs for Tiered Storage plugin - inside the Kafka image. This is then configured inside the classpath field for Tiered Storage spec inside the Kafka CR.                                                                                            | /opt/kafka/plugins/tiered-storage/*                               |
 | KAFKA_TIERED_STORAGE_BASE_IMAGE       | Base Kafka image that will be used for building a new custom one - adding the Aiven Tiered Storage plugin to it. If both this env variable and `KAFKA_TIERED_STORAGE_IMAGE` are configured, the `KAFKA_TIERED_STORAGE_IMAGE` takes precedence and no image is built. | quay.io/strimzi/kafka:latest-kafka-LATEST_SUPPORTED_KAFKA_VERSION |
 | CLUSTER_SECURITY_ENCRYPTION           | Encryption used for the internal communication of the Kafka clusters deployed by the tests. Supported values are `tls` and `none`.                                                                                                                                   | tls                                                               |
-| CLUSTER_SECURITY_AUTHENTICATION       | Authentication used for the internal communication of the Kafka clusters deployed by the tests. Supported values are `mtls` and `none`. `mtls` can be used only together with `tls` encryption.                                                                      | mtls                                                              |
+| CLUSTER_SECURITY_AUTHENTICATION       | Authentication used for the internal communication of the Kafka clusters deployed by the tests. Supported values are `mtls`, `service-account` and `none`. `mtls` can be used only together with `tls` encryption.                                                   | mtls                                                              |
 
 If you want to use your images with a different tag or from a separate repository, you can use `DOCKER_REGISTRY`, `DOCKER_ORG` and `DOCKER_TAG` environment variables.
 
