@@ -51,28 +51,22 @@ public class FeatureGatesTest {
 
     @Test
     public void testFeatureGatesParsing() {
-        assertThat(new FeatureGates("+UseConnectBuildWithBuildah").useConnectBuildWithBuildahEnabled(), is(true));
-        assertThat(new FeatureGates("-UseConnectBuildWithBuildah").useConnectBuildWithBuildahEnabled(), is(false));
-        assertThat(new FeatureGates("   -UseConnectBuildWithBuildah   ").useConnectBuildWithBuildahEnabled(), is(false));
-
         assertThat(new FeatureGates("+UseBackgroundPodDeletion").useBackgroundPodDeletionEnabled(), is(true));
         assertThat(new FeatureGates("-UseBackgroundPodDeletion").useBackgroundPodDeletionEnabled(), is(false));
         assertThat(new FeatureGates("   +UseBackgroundPodDeletion   ").useBackgroundPodDeletionEnabled(), is(true));
 
-        assertThat(new FeatureGates("-UseBackgroundPodDeletion,-UseConnectBuildWithBuildah").useConnectBuildWithBuildahEnabled(), is(false));
-        assertThat(new FeatureGates("-UseBackgroundPodDeletion,-UseConnectBuildWithBuildah").useConnectBuildWithBuildahEnabled(), is(false));
-        assertThat(new FeatureGates("  +UseBackgroundPodDeletion    ,    +UseConnectBuildWithBuildah").useBackgroundPodDeletionEnabled(), is(true));
-        assertThat(new FeatureGates("  +UseBackgroundPodDeletion    ,    +UseConnectBuildWithBuildah").useConnectBuildWithBuildahEnabled(), is(true));
-        assertThat(new FeatureGates("+UseConnectBuildWithBuildah,-UseBackgroundPodDeletion").useBackgroundPodDeletionEnabled(), is(false));
-        assertThat(new FeatureGates("+UseConnectBuildWithBuildah,-UseBackgroundPodDeletion").useConnectBuildWithBuildahEnabled(), is(true));
+//        Once we have again two (and more) feature gates, we should uncomment these checks
+//        assertThat(new FeatureGates("-UseBackgroundPodDeletion,-DummyFeatureGate").useBackgroundPodDeletionEnabled(), is(false));
+//        assertThat(new FeatureGates("  +UseBackgroundPodDeletion    ,    +DummyFeatureGate").useBackgroundPodDeletionEnabled(), is(true));
+//        assertThat(new FeatureGates("+DummyFeatureGate,-UseBackgroundPodDeletion").useBackgroundPodDeletionEnabled(), is(false));
     }
 
     @Test
     public void testFeatureGatesEquals() {
-        FeatureGates fg = new FeatureGates("+UseBackgroundPodDeletion");
+        FeatureGates fg = new FeatureGates("-UseBackgroundPodDeletion");
         assertThat(fg, is(fg));
-        assertThat(fg, is(new FeatureGates("+UseBackgroundPodDeletion")));
-        assertThat(fg, is(not(new FeatureGates("-UseBackgroundPodDeletion"))));
+        assertThat(fg, is(new FeatureGates("-UseBackgroundPodDeletion")));
+        assertThat(fg, is(not(new FeatureGates("+UseBackgroundPodDeletion"))));
     }
 
     @Test
@@ -119,10 +113,7 @@ public class FeatureGatesTest {
     public void testEnvironmentVariable()   {
         assertThat(new FeatureGates("").toEnvironmentVariable(), is(""));
 
-        assertThat(new FeatureGates("+UseConnectBuildWithBuildah").toEnvironmentVariable(), is(""));
-        assertThat(new FeatureGates("-UseConnectBuildWithBuildah").toEnvironmentVariable(), is("-UseConnectBuildWithBuildah"));
-
-        assertThat(new FeatureGates("+UseBackgroundPodDeletion").toEnvironmentVariable(), is("+UseBackgroundPodDeletion"));
-        assertThat(new FeatureGates("-UseBackgroundPodDeletion").toEnvironmentVariable(), is(""));
+        assertThat(new FeatureGates("+UseBackgroundPodDeletion").toEnvironmentVariable(), is(""));
+        assertThat(new FeatureGates("-UseBackgroundPodDeletion").toEnvironmentVariable(), is("-UseBackgroundPodDeletion"));
     }
 }
