@@ -14,6 +14,7 @@ import io.skodjob.annotations.TestDoc;
 import io.skodjob.kubetest4j.resources.KubeResourceManager;
 import io.strimzi.api.kafka.model.common.Condition;
 import io.strimzi.api.kafka.model.kafka.KafkaResources;
+import io.strimzi.api.kafka.model.kafka.clustersecurity.ClusterSecurityAuthenticationType;
 import io.strimzi.api.kafka.model.kafka.listener.GenericKafkaListenerBuilder;
 import io.strimzi.api.kafka.model.kafka.listener.KafkaListenerAuthenticationTls;
 import io.strimzi.api.kafka.model.kafka.listener.KafkaListenerType;
@@ -32,6 +33,7 @@ import io.strimzi.systemtest.Environment;
 import io.strimzi.systemtest.TestConstants;
 import io.strimzi.systemtest.annotations.ParallelNamespaceTest;
 import io.strimzi.systemtest.annotations.ParallelTest;
+import io.strimzi.systemtest.annotations.RequiresSharedNamespace;
 import io.strimzi.systemtest.cli.KafkaCmdClient;
 import io.strimzi.systemtest.docs.TestDocsLabels;
 import io.strimzi.systemtest.kafkaclients.ClientsAuthentication;
@@ -68,6 +70,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.valid4j.matchers.jsonpath.JsonPathMatchers.hasJsonPath;
 
 @Tag(REGRESSION)
@@ -81,6 +84,7 @@ import static org.valid4j.matchers.jsonpath.JsonPathMatchers.hasJsonPath;
         @Label(TestDocsLabels.USER_OPERATOR)
     }
 )
+@RequiresSharedNamespace("Needed for shared Kafka cluster created inside the test-suite-namespace.")
 class UserST extends AbstractST {
 
     private static final Logger LOGGER = LogManager.getLogger(UserST.class);
@@ -471,6 +475,9 @@ class UserST extends AbstractST {
     )
     @ParallelNamespaceTest
     void testTlsExternalUser() {
+        // This test uses authorization and is therefore skipped when `type: none` cluster security authentication is used
+        assumeFalse(ClusterSecurityAuthenticationType.NONE.equals(Environment.CLUSTER_SECURITY_AUTHENTICATION));
+
         final TestStorage testStorage = new TestStorage(KubeResourceManager.get().getTestContext());
         String consumerGroupName = ClientUtils.generateRandomConsumerGroup();
 
